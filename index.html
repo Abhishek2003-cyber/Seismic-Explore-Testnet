@@ -216,7 +216,10 @@
 
 <script>
     // 1. Config & Setup
-    const RPC_URL = "https://node-2.seismicdev.net/rpc";
+    const CONFIG = {
+        RPC_URL: "https://gcp-2.seismictest.net/rpc",
+        SOCIALSCAN_HOST: "https://api.socialscan.io/seismic-testnet"
+    };
     let provider;
     
     // UI Elements
@@ -278,7 +281,7 @@
         initChart(); // Start the empty chart
 
         try {
-            provider = new ethers.JsonRpcProvider(RPC_URL);
+            provider = new ethers.JsonRpcProvider(CONFIG.RPC_URL);
             const network = await provider.getNetwork();
             
             elStatus.innerHTML = "🟢 Live Connected";
@@ -291,15 +294,17 @@
             provider.on("block", async (blockNumber) => {
                 elLatestBlock.innerText = blockNumber;
                 
-                // Get Block & Gas Data in parallel
-                const [block, feeData] = await Promise.all([
-                    provider.getBlock(blockNumber),
-                    provider.getFeeData()
-                ]);
+                try {
+                    // Get Block & Gas Data (Separated for robustness)
+                    const block = await provider.getBlock(blockNumber);
+                    const feeData = await provider.getFeeData().catch(e => ({ gasPrice: null }));
 
-                // Update UI Components
-                updateTable(block);
-                updateGasAndChart(blockNumber, feeData);
+                    // Update UI Components
+                    if (block) updateTable(block);
+                    if (feeData) updateGasAndChart(blockNumber, feeData);
+                } catch (err) {
+                    console.error("Error processing block:", err);
+                }
             });
 
         } catch (error) {
